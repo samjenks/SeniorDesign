@@ -188,8 +188,36 @@ def modify_access(intent, session):
 
     if 'Identifier' in intent['slots'] and 'value' in intent['slots']['Identifier']:
         user = intent['slots']['Identifier']['value']
-        
 
+        if 'AccessTime' in intent['slots'] and 'value' in intent['slots']['AccessTime']:
+            t_period = intent['slots']['AccessTime']['value']
+            speech_output = "Thank you, User, and Time Modified"
+            reprompt_text = "Would you like to do anything else?"
+            package = {user: {"Time": t_period}}
+            s3_send(str(package), "GiveAccess.txt")
+
+        else:
+            speech_output = "You need to give me a time or duration to extend"
+            reprompt_text = "Please re-issue command with a time or duration specified"
+
+    else:
+        speech_output = "You need to give me an identifier to recognize a specific person"
+        reprompt_text = "Please re-issue command with a person specified"
+
+    return build_response(session_attributes, build_speechlet_response(
+        card_title, speech_output, reprompt_text, should_end_session))
+
+        
+def invalid_command(intent, session):
+    card_title = intent['name']
+    session_attributes = {}
+    should_end_session = False
+
+    speech_output = "The Command you used is not recognized"
+    reprompt_text = "Please re-issue command"
+
+    return build_response(session_attributes, build_speechlet_response(
+        card_title, speech_output, reprompt_text, should_end_session))
 
 
 # --------------- Events ------------------
@@ -231,7 +259,7 @@ def on_intent(intent_request, session):
     elif intent_name == "AMAZON.CancelIntent" or intent_name == "AMAZON.StopIntent":
         return handle_session_end_request()
     else:
-        raise ValueError("Invalid intent")
+        return invalid_command(intent, session)
 
 
 def on_session_ended(session_ended_request, session):
