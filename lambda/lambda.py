@@ -113,7 +113,7 @@ def give_access(intent, session):
                 t_period = intent['slots']['AccessTime']['value']
                 speech_output = "Thank you, User, Area and Time Confirmed"
                 reprompt_text = "Would you like to do anything else?"
-                package = {user: {"Access": "general", "Area": area, "Time": t_period}}
+                package = {user: {"Access": "general", "Attempts": 3, "Area": area, "Time": t_period}}
                 s3_send(package, "g")
 
 
@@ -149,7 +149,10 @@ def remove_access(intent, session):
             area = intent['slots']['AccessArea']['value']
             speech_output = user + " has had their access to area: " + area + " revoked"
             reprompt_text = "Would you like to do anything else?"
-            package = {user: {"Access": "None", "Area": area}}
+            package = {user: {"Access": "None", "Attempts": 0, "Area": area}}
+
+        else:
+            package = {user: {"Access": "None", "Attempts": 0}}
 
         s3_send(package, "r")
 
