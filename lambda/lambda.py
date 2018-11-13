@@ -78,9 +78,9 @@ def handle_session_end_request():
 def s3_send(package, code):
 
     s3 = boto3.client('s3')
-
+    KEY = 'Access.json'
     # Get json object file
-    json_obj = s3.get_object(Bucket='securityconfigs', Key='Access.json')
+    json_obj = s3.get_object(Bucket='securityconfigs', Key=KEY)
     json_dict = json.loads(json_obj['Body'].read().decode('utf-8'))
 
     # Change dictionary package here:
@@ -95,7 +95,7 @@ def s3_send(package, code):
             json_dict[user][key] = package[user][key]
 
     # Write to S3 Bucket
-    s3.put_object(Body=bytes(json.dumps(json_dict).encode('UTF-8')), Bucket='securityconfigs', Key='Access.json')
+    s3.put_object(Body=bytes(json.dumps(json_dict).encode('UTF-8')), Bucket='securityconfigs', Key=KEY)
 
 
 def give_access(intent, session):
