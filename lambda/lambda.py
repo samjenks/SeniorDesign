@@ -75,47 +75,27 @@ def handle_session_end_request():
         card_title, speech_output, None, should_end_session))
 
 
-def set_color_in_session(intent, session):
-    """ Sets the color in the session and prepares the speech to reply to the
-    user.
-    """
+def s3_send(package, code):
 
-    card_title = intent['name']
-    session_attributes = {}
-    should_end_session = False
+    s3 = boto3.client('s3')
 
-    if 'Color' in intent['slots']:
-        favorite_color = intent['slots']['Color']['value']
-        session_attributes = create_favorite_color_attributes(favorite_color)
-        speech_output = "I now know your favorite color is " + \
-                        favorite_color + \
-                        ". You can ask me your favorite color by saying, " \
-                        "what's my favorite color?"
-        reprompt_text = "You can ask me your favorite color by saying, " \
-                        "what's my favorite color?"
-    else:
-        speech_output = "I'm not sure what your favorite color is. " \
-                        "Please try again."
-        reprompt_text = "I'm not sure what your favorite color is. " \
-                        "You can tell me your favorite color by saying, " \
-                        "my favorite color is red."
-    return build_response(session_attributes, build_speechlet_response(
-        card_title, speech_output, reprompt_text, should_end_session))
+    # Get json object file
+    json_obj = s3.get_object(Bucket='securityconfigs', Key='Access.json')
+    json_dict = json.loads(json_obj['Body'].read().decode('utf-8'))
 
+    # Change dictionary package here:
+    user = list(package.keys())[0]
+    if code == 'g':
+        json_dict[user] = package[user]
+    elif code == 'm':
+        for key in package[user]:
+            json_dict[user][key] = package[user][key]
+    elif code == 'r':
+        for key in package[user]:
+            json_dict[user][key] = package[user][key]
 
-def s3_send(package, filename):
-    string = "hey todd"
-
-    file_name = filename
-    lambda_path = "/tmp/" + file_name
-    s3_path = file_name
-
-    with open(lambda_path, 'w+') as file:
-        file.write(package)
-        file.close()
-
-    s3 = boto3.resource('s3')
-    s3.meta.client.upload_file(lambda_path, 'securityconfigs', s3_path)
+    # Write to S3 Bucket
+    s3.put_object(Body=bytes(json.dumps(json_dict).encode('UTF-8')), Bucket='securityconfigs', Key='Access.json')
 
 
 def give_access(intent, session):
@@ -133,8 +113,8 @@ def give_access(intent, session):
                 t_period = intent['slots']['AccessTime']['value']
                 speech_output = "Thank you, User, Area and Time Confirmed"
                 reprompt_text = "Would you like to do anything else?"
-                package = {user: {"Area": area, "Time": t_period}}
-                s3_send(str(package), "GiveAccess.txt")
+                package = {user: {"Access": "general", "Area": area, "Time": t_period}}
+                s3_send(package, "g")
 
 
             else:
@@ -169,9 +149,9 @@ def remove_access(intent, session):
             area = intent['slots']['AccessArea']['value']
             speech_output = user + " has had their access to area: " + area + " revoked"
             reprompt_text = "Would you like to do anything else?"
-            package = {user: {"Area": area}}
+            package = {user: {"Access": "None", "Area": area}}
 
-        s3_send(str(package), "RemoveAccess.txt")
+        s3_send(package, "r")
 
     else:
         speech_output = "You need to give me an identifier to recognize a specific person"
@@ -194,7 +174,7 @@ def modify_access(intent, session):
             speech_output = "Thank you, User, and Time Modified"
             reprompt_text = "Would you like to do anything else?"
             package = {user: {"Time": t_period}}
-            s3_send(str(package), "GiveAccess.txt")
+            s3_send(package, "m")
 
         else:
             speech_output = "You need to give me a time or duration to extend"
