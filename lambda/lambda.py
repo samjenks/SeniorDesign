@@ -10,6 +10,7 @@ http://amzn.to/1LGWsLG
 from __future__ import print_function
 import json
 import boto3
+from datetime import datetime as dt
 
 
 # --------------- Helpers that build all of the responses ----------------------
@@ -110,10 +111,15 @@ def give_access(intent, session):
             area = intent['slots']['AccessArea']['value']
 
             if 'AccessTime' in intent['slots'] and 'value' in intent['slots']['AccessTime']:
-                t_period = intent['slots']['AccessTime']['value']
+                end_time = intent['slots']['AccessTime']['value']
+                time = dt.time(dt.now())
+                mins = str(time.minute).replace(" ", "0")
+                hour = str(time.hour).replace(" ", "0")
+                start_time = hour + ":" + mins
                 speech_output = "Thank you, User, Area and Time Confirmed"
                 reprompt_text = "Would you like to do anything else?"
-                package = {user: {"Access": "general", "Attempts": 3, "Area": area, "Time": t_period}}
+                package = {user: {"Access": "general", "Attempts": 3, "Area": area, "Time":
+                    {"start": start_time, "end": end_time}}}
                 s3_send(package, "g")
 
 
