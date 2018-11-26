@@ -255,9 +255,9 @@ def modify_access(intent, session):
             package = {user: {"Time": {"start": start_time, "end": end_time}}}
             s3_send(package, "m")
 
-        if 'AccessAttempts' in intent['slots'] and 'value' in intent['slots']['AccessTime']:
-            attempts = intent['slots']['AccessTime']['value']
-            speech_output = "Thank you, " + str(user) + " has been given " + str(attempts) + "additional attempts"
+        if 'AccessAttempts' in intent['slots'] and 'value' in intent['slots']['AccessAttempts']:
+            attempts = intent['slots']['AccessAttempts']['value']
+            speech_output = "Thank you, " + str(user) + " has been given " + str(attempts) + " additional attempts"
             reprompt_text = "Would you like to do anything else?"
             package = {user: {"Attempts": attempts}}
             s3_send(package, "m")
