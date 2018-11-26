@@ -53,7 +53,7 @@ def get_welcome_response():
 
     session_attributes = {}
     card_title = "Welcome"
-    speech_output = "Welcome to the Allegeon Security Service " \
+    speech_output = "Welcome to the Allegion Security Service " \
                     "What would you like to do today?"
 
     # If the user either does not reply to the welcome message or says something
@@ -103,6 +103,8 @@ def give_access(intent, session):
     card_title = intent['name']
     session_attributes = {}
     should_end_session = False
+    speech_output = "There was an error processing your request"
+    reprompt_text = "please try again"
 
     if 'Identifier' in intent['slots'] and 'value' in intent['slots']['Identifier']:
         user = intent['slots']['Identifier']['value']
@@ -116,20 +118,74 @@ def give_access(intent, session):
                 mins = str(time.minute).replace(" ", "0")
                 hour = str(time.hour).replace(" ", "0")
                 start_time = hour + ":" + mins
-                speech_output = "Thank you, User, Area and Time Confirmed"
+                attempts = 3
+
+                if 'AccessAttempts' in intent['slots'] and 'value' in intent['slots']['AccessAttempts']:
+                    attempts = intent['slots']['AccessAttempts']['value']
+
+                speech_output = "Thank you, " + str(user) + " has access to " + str(area) + " for " + end_time
                 reprompt_text = "Would you like to do anything else?"
-                package = {user: {"Access": "general", "Attempts": 3, "Area": area, "Time":
+                package = {user: {"Access": "general", "Attempts": attempts, "Area": area, "Time":
                     {"start": start_time, "end": end_time}}}
                 s3_send(package, "g")
 
+            elif 'AccessTimePeriodStart' in intent['slots'] and 'AccessTimePeriodEnd' in intent['slots'] and \
+                            'value' in intent['slots']['AccessTimePeriodStart'] and \
+                            'value' in intent['slots']['AccessTimePeriodEnd']:
+                speech_output = "Thank you, " + str(user) + " has access to " + str(area) + " from " + \
+                                intent['slots']['AccessTimePeriodStart']['value'] + " until " + \
+                                intent['slots']['AccessTimePeriodEnd']['value']
+                reprompt_text = "Would you like to do anything else?"
+                attempts = 3
+                if 'AccessAttempts' in intent['slots'] and 'value' in intent['slots']['AccessAttempts']:
+                    attempts = intent['slots']['AccessAttempts']['value']
+
+                package = {user: {"Access": "general", "Attempts": attempts, "Area": area, "Time":
+                    {"start": intent['slots']['AccessTimePeriodStart']['value'],
+                     "end": intent['slots']['AccessTimePeriodEnd']['value']}}}
+                s3_send(package, "g")
 
             else:
                 speech_output = "You need to give me a time or duration that " + user + " can access " + area + " for"
                 reprompt_text = "Please re-issue command with a time or duration specified"
 
         else:
-            speech_output = "You need to give me an area that " + user + "can access"
-            reprompt_text = "Please re-issue command with an area specified"
+            if 'AccessTime' in intent['slots'] and 'value' in intent['slots']['AccessTime']:
+                end_time = intent['slots']['AccessTime']['value']
+                time = dt.time(dt.now())
+                mins = str(time.minute).replace(" ", "0")
+                hour = str(time.hour).replace(" ", "0")
+                start_time = hour + ":" + mins
+                attempts = 3
+
+                if 'AccessAttempts' in intent['slots'] and 'value' in intent['slots']['AccessAttempts']:
+                    attempts = intent['slots']['AccessAttempts']['value']
+
+                speech_output = "Thank you, " + str(user) + " has general access for " + end_time
+                reprompt_text = "Would you like to do anything else?"
+                package = {user: {"Access": "general", "Attempts": attempts, "Area": "General Area", "Time":
+                    {"start": start_time, "end": end_time}}}
+                s3_send(package, "g")
+
+            elif 'AccessTimePeriodStart' in intent['slots'] and 'AccessTimePeriodEnd' in intent['slots'] and \
+                            'value' in intent['slots']['AccessTimePeriodStart'] and \
+                            'value' in intent['slots']['AccessTimePeriodEnd']:
+                speech_output = "Thank you, " + str(user) + " has general access from " + \
+                                intent['slots']['AccessTimePeriodStart']['value'] + " until " + \
+                                intent['slots']['AccessTimePeriodEnd']['value']
+                reprompt_text = "Would you like to do anything else?"
+                attempts = 3
+                if 'AccessAttempts' in intent['slots'] and 'value' in intent['slots']['AccessAttempts']:
+                    attempts = intent['slots']['AccessAttempts']['value']
+
+                package = {user: {"Access": "general", "Attempts": attempts, "Area": "General Area", "Time":
+                    {"start": intent['slots']['AccessTimePeriodStart']['value'],
+                     "end": intent['slots']['AccessTimePeriodEnd']['value']}}}
+                s3_send(package, "g")
+
+            else:
+                speech_output = "You need to give me a time or duration that " + user + " has access"
+                reprompt_text = "Please re-issue command with a time or duration specified"
 
     else:
         speech_output = "You need to give me an identifier to recognize a specific person"
@@ -180,14 +236,36 @@ def modify_access(intent, session):
 
         if 'AccessTime' in intent['slots'] and 'value' in intent['slots']['AccessTime']:
             t_period = intent['slots']['AccessTime']['value']
-            speech_output = "Thank you, User, and Time Modified"
+            time = dt.time(dt.now())
+            mins = str(time.minute).replace(" ", "0")
+            hour = str(time.hour).replace(" ", "0")
+            start_time = hour + ":" + mins
+            speech_output = "Thank you, " + user + "'s time has been extended by " + str(t_period)
             reprompt_text = "Would you like to do anything else?"
-            package = {user: {"Time": t_period}}
+            package = {user: {"Time": {"start": start_time, "end": t_period}}}
             s3_send(package, "m")
 
+        elif 'AccessTimePeriodStart' in intent['slots'] and 'AccessTimePeriodEnd' in intent['slots'] and \
+                            'value' in intent['slots']['AccessTimePeriodStart'] and \
+                            'value' in intent['slots']['AccessTimePeriodEnd']:
+            start_time = intent['slots']['AccessTimePeriodStart']['value']
+            end_time = intent['slots']['AccessTimePeriodEnd']['value']
+            speech_output = "Thank you, " + user + "'s hours have been changed to " + str(start_time) + " to " + str(end_time)
+            reprompt_text = "Would you like to do anything else?"
+            package = {user: {"Time": {"start": start_time, "end": end_time}}}
+            s3_send(package, "m")
+
+        if 'AccessAttempts' in intent['slots'] and 'value' in intent['slots']['AccessTime']:
+            attempts = intent['slots']['AccessTime']['value']
+            speech_output = "Thank you, " + str(user) + " has been given " + str(attempts) + "additional attempts"
+            reprompt_text = "Would you like to do anything else?"
+            package = {user: {"Attempts": attempts}}
+            s3_send(package, "m")
         else:
-            speech_output = "You need to give me a time or duration to extend"
-            reprompt_text = "Please re-issue command with a time or duration specified"
+            speech_output = "You need to give me something to change"
+            reprompt_text = "Please re-issue command "
+
+
 
     else:
         speech_output = "You need to give me an identifier to recognize a specific person"
@@ -243,6 +321,8 @@ def on_intent(intent_request, session):
         return give_access(intent, session)
     elif intent_name == "RemoveAccess":
         return remove_access(intent, session)
+    elif intent_name == "ModifyAccess":
+        return modify_access(intent, session)
     elif intent_name == "AMAZON.HelpIntent":
         return get_welcome_response()
     elif intent_name == "AMAZON.CancelIntent" or intent_name == "AMAZON.StopIntent":
