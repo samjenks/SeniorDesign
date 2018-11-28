@@ -90,7 +90,11 @@ def s3_send(package, code):
         json_dict[user] = package[user]
     elif code == 'm':
         for key in package[user]:
-            json_dict[user][key] = package[user][key]
+            if key == 'Time':
+                for subkey in package[user]['Time']:
+                    json_dict[user][key]['Time'][subkey] = package[user][key]['Time'][subkey]
+            else:
+                json_dict[user][key] = package[user][key]
     elif code == 'r':
         for key in package[user]:
             json_dict[user][key] = package[user][key]
@@ -245,22 +249,27 @@ def modify_access(intent, session):
             package = {user: {"Time": {"start": start_time, "end": t_period}}}
             s3_send(package, "m")
 
-        elif 'AccessTimePeriodStart' in intent['slots'] and 'AccessTimePeriodEnd' in intent['slots'] and \
-                            'value' in intent['slots']['AccessTimePeriodStart'] and \
-                            'value' in intent['slots']['AccessTimePeriodEnd']:
+        elif 'AccessTimePeriodStart' in intent['slots'] and 'value' in intent['slots']['AccessTimePeriodStart']:
             start_time = intent['slots']['AccessTimePeriodStart']['value']
-            end_time = intent['slots']['AccessTimePeriodEnd']['value']
-            speech_output = "Thank you, " + user + "'s hours have been changed to " + str(start_time) + " to " + str(end_time)
+            speech_output = "Thank you, " + user + "'s hours have been changed to start at: " + str(start_time)
             reprompt_text = "Would you like to do anything else?"
-            package = {user: {"Time": {"start": start_time, "end": end_time}}}
+            package = {user: {"Time": {"start": start_time}}}
             s3_send(package, "m")
 
-        if 'AccessAttempts' in intent['slots'] and 'value' in intent['slots']['AccessAttempts']:
+        elif 'AccessTimePeriodEnd' in intent['slots'] and 'value' in intent['slots']['AccessTimePeriodEnd']:
+            end_time = intent['slots']['AccessTimePeriodEnd']['value']
+            speech_output = "Thank you, " + user + "'s hours have been changed to end at: " + str(end_time)
+            reprompt_text = "Would you like to do anything else?"
+            package = {user: {"Time": {"end": end_time}}}
+            s3_send(package, "m")
+
+        elif 'AccessAttempts' in intent['slots'] and 'value' in intent['slots']['AccessAttempts']:
             attempts = intent['slots']['AccessAttempts']['value']
             speech_output = "Thank you, " + str(user) + " has been given " + str(attempts) + " additional attempts"
             reprompt_text = "Would you like to do anything else?"
             package = {user: {"Attempts": attempts}}
             s3_send(package, "m")
+
         else:
             speech_output = "You need to give me something to change"
             reprompt_text = "Please re-issue command "
