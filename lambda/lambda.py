@@ -58,8 +58,8 @@ def get_welcome_response():
 
     # If the user either does not reply to the welcome message or says something
     # that is not understood, they will be prompted again with this text.
-    reprompt_text = "Please tell me your favorite color by saying, " \
-                    "my favorite color is red."
+    reprompt_text = "I'm really just a rock that has been tricked into thinking, can you rephrase that command so my " \
+                    "pea sized brain can understand it"
     should_end_session = False
     #s3_send()
     return build_response(session_attributes, build_speechlet_response(
@@ -83,25 +83,31 @@ def s3_send(package, code):
     # Get json object file
     json_obj = s3.get_object(Bucket='securityconfigs', Key=KEY)
     json_dict = json.loads(json_obj['Body'].read().decode('utf-8'))
-
+    err = False
     # Change dictionary package here:
     user = list(package.keys())[0]
     if code == 'g':
         json_dict[user] = package[user]
     elif code == 'm':
-        for key in package[user]:
-            if key == 'Time':
-                for subkey in package[user]['Time']:
-                    json_dict[user][key]['Time'][subkey] = package[user][key]['Time'][subkey]
-            else:
-                json_dict[user][key] = package[user][key]
+        if user in json_dict:
+            for key in package[user]:
+                if key == 'Time':
+                    for subkey in package[user][key]:
+                        json_dict[user][key][subkey] = package[user][key][subkey]
+                else:
+                    json_dict[user][key] = package[user][key]
+        else:
+            err = True
     elif code == 'r':
-        for key in package[user]:
-            json_dict[user][key] = package[user][key]
+        if user in json_dict:
+            for key in package[user]:
+                json_dict[user][key] = package[user][key]
+        else:
+            err = True
 
     # Write to S3 Bucket
     s3.put_object(Body=bytes(json.dumps(json_dict).encode('UTF-8')), Bucket='securityconfigs', Key=KEY)
-
+    return err
 
 def give_access(intent, session):
     card_title = intent['name']
@@ -129,9 +135,9 @@ def give_access(intent, session):
 
                 speech_output = "Thank you, " + str(user) + " has access to " + str(area) + " for " + end_time
                 reprompt_text = "Would you like to do anything else?"
-                package = {user: {"Access": "general", "Attempts": attempts, "Area": area, "Time":
+                package = {user: {"Access": "general", "Time Stamp": start_time, "Attempts": attempts, "Area": area, "Time":
                     {"start": start_time, "end": end_time}}}
-                s3_send(package, "g")
+                err = s3_send(package, "g")
 
             elif 'AccessTimePeriodStart' in intent['slots'] and 'AccessTimePeriodEnd' in intent['slots'] and \
                             'value' in intent['slots']['AccessTimePeriodStart'] and \
@@ -144,10 +150,14 @@ def give_access(intent, session):
                 if 'AccessAttempts' in intent['slots'] and 'value' in intent['slots']['AccessAttempts']:
                     attempts = intent['slots']['AccessAttempts']['value']
 
-                package = {user: {"Access": "general", "Attempts": attempts, "Area": area, "Time":
+                time = dt.time(dt.now())
+                mins = str(time.minute).replace(" ", "0")
+                hour = str(time.hour).replace(" ", "0")
+                time_stamp = hour + ":" + mins
+                package = {user: {"Access": "general", "Time Stamp":time_stamp, "Attempts": attempts, "Area": area, "Time":
                     {"start": intent['slots']['AccessTimePeriodStart']['value'],
                      "end": intent['slots']['AccessTimePeriodEnd']['value']}}}
-                s3_send(package, "g")
+                err = s3_send(package, "g")
 
             else:
                 speech_output = "You need to give me a time or duration that " + user + " can access " + area + " for"
@@ -167,7 +177,7 @@ def give_access(intent, session):
 
                 speech_output = "Thank you, " + str(user) + " has general access for " + end_time
                 reprompt_text = "Would you like to do anything else?"
-                package = {user: {"Access": "general", "Attempts": attempts, "Area": "General Area", "Time":
+                package = {user: {"Access": "general", "Time Stamp":start_time, "Attempts": attempts, "Area": "General Area", "Time":
                     {"start": start_time, "end": end_time}}}
                 s3_send(package, "g")
 
@@ -182,7 +192,11 @@ def give_access(intent, session):
                 if 'AccessAttempts' in intent['slots'] and 'value' in intent['slots']['AccessAttempts']:
                     attempts = intent['slots']['AccessAttempts']['value']
 
-                package = {user: {"Access": "general", "Attempts": attempts, "Area": "General Area", "Time":
+                time = dt.time(dt.now())
+                mins = str(time.minute).replace(" ", "0")
+                hour = str(time.hour).replace(" ", "0")
+                time_stamp = hour + ":" + mins
+                package = {user: {"Access": "general", "Time Stamp": time_stamp, "Attempts": attempts, "Area": "General Area", "Time":
                     {"start": intent['slots']['AccessTimePeriodStart']['value'],
                      "end": intent['slots']['AccessTimePeriodEnd']['value']}}}
                 s3_send(package, "g")
@@ -194,7 +208,9 @@ def give_access(intent, session):
     else:
         speech_output = "You need to give me an identifier to recognize a specific person"
         reprompt_text = "Please re-issue command with a person specified"
-
+    if err:
+        speech_output = "The Person you specified is not in the database"
+        reprompt_text = "Please re-issue command with a correct person specified"
 
     return build_response(session_attributes, build_speechlet_response(
         card_title, speech_output, reprompt_text, should_end_session))
@@ -211,21 +227,28 @@ def remove_access(intent, session):
         speech_output = user + " deleted."
         reprompt_text = "Would you like to do anything else?"
         package = {user: "No Access"}
+        time = dt.time(dt.now())
+        mins = str(time.minute).replace(" ", "0")
+        hour = str(time.hour).replace(" ", "0")
+        time_stamp = hour + ":" + mins
         if 'AccessArea' in intent['slots'] and 'value' in intent['slots']['AccessArea']:
             area = intent['slots']['AccessArea']['value']
             speech_output = user + " has had their access to area: " + area + " revoked"
             reprompt_text = "Would you like to do anything else?"
-            package = {user: {"Access": "None", "Attempts": 0, "Area": area}}
+            package = {user: {"Access": "None", "Time Stamp": time_stamp, "Attempts": 0, "Area": area}}
 
         else:
-            package = {user: {"Access": "None", "Attempts": 0}}
+            package = {user: {"Access": "None", "Time Stamp": time_stamp, "Attempts": 0}}
 
-        s3_send(package, "r")
+            err = s3_send(package, "r")
 
     else:
         speech_output = "You need to give me an identifier to recognize a specific person"
         reprompt_text = "Please re-issue command with a person specified"
 
+    if err:
+        speech_output = "The Person you specified is not in the database"
+        reprompt_text = "Please re-issue command with a correct person specified"
     return build_response(session_attributes, build_speechlet_response(
         card_title, speech_output, reprompt_text, should_end_session))
 
@@ -237,6 +260,10 @@ def modify_access(intent, session):
 
     if 'Identifier' in intent['slots'] and 'value' in intent['slots']['Identifier']:
         user = intent['slots']['Identifier']['value']
+        time = dt.time(dt.now())
+        mins = str(time.minute).replace(" ", "0")
+        hour = str(time.hour).replace(" ", "0")
+        time_stamp = hour + ":" + mins
 
         if 'AccessTime' in intent['slots'] and 'value' in intent['slots']['AccessTime']:
             t_period = intent['slots']['AccessTime']['value']
@@ -246,29 +273,29 @@ def modify_access(intent, session):
             start_time = hour + ":" + mins
             speech_output = "Thank you, " + user + "'s time has been extended by " + str(t_period)
             reprompt_text = "Would you like to do anything else?"
-            package = {user: {"Time": {"start": start_time, "end": t_period}}}
-            s3_send(package, "m")
+            package = {user: {"Time Stamp": time_stamp, "Time": {"start": start_time, "end": t_period}}}
+            err = s3_send(package, "m")
 
         elif 'AccessTimePeriodStart' in intent['slots'] and 'value' in intent['slots']['AccessTimePeriodStart']:
             start_time = intent['slots']['AccessTimePeriodStart']['value']
             speech_output = "Thank you, " + user + "'s hours have been changed to start at: " + str(start_time)
             reprompt_text = "Would you like to do anything else?"
-            package = {user: {"Time": {"start": start_time}}}
-            s3_send(package, "m")
+            package = {user: {"Time Stamp": time_stamp, "Time": {"start": start_time}}}
+            err = s3_send(package, "m")
 
         elif 'AccessTimePeriodEnd' in intent['slots'] and 'value' in intent['slots']['AccessTimePeriodEnd']:
             end_time = intent['slots']['AccessTimePeriodEnd']['value']
             speech_output = "Thank you, " + user + "'s hours have been changed to end at: " + str(end_time)
             reprompt_text = "Would you like to do anything else?"
-            package = {user: {"Time": {"end": end_time}}}
-            s3_send(package, "m")
+            package = {user: {"Time Stamp": time_stamp, "Time": {"end": end_time}}}
+            err = s3_send(package, "m")
 
         elif 'AccessAttempts' in intent['slots'] and 'value' in intent['slots']['AccessAttempts']:
             attempts = intent['slots']['AccessAttempts']['value']
             speech_output = "Thank you, " + str(user) + " has been given " + str(attempts) + " additional attempts"
             reprompt_text = "Would you like to do anything else?"
-            package = {user: {"Attempts": attempts}}
-            s3_send(package, "m")
+            package = {user: {"Time Stamp": time_stamp, "Attempts": attempts}}
+            err = s3_send(package, "m")
 
         else:
             speech_output = "You need to give me something to change"
@@ -279,6 +306,10 @@ def modify_access(intent, session):
     else:
         speech_output = "You need to give me an identifier to recognize a specific person"
         reprompt_text = "Please re-issue command with a person specified"
+
+    if err:
+        speech_output = "The Person you specified is not in the database"
+        reprompt_text = "Please re-issue command with a correct person specified"
 
     return build_response(session_attributes, build_speechlet_response(
         card_title, speech_output, reprompt_text, should_end_session))
