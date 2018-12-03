@@ -68,7 +68,7 @@ def get_welcome_response():
 
 def handle_session_end_request():
     card_title = "Session Ended"
-    speech_output = "Thank you for trying the Alexa Skills Kit sample. " \
+    speech_output = "Thank you for using the Allegion Security Protocol. " \
                     "Have a nice day! "
     # Setting this to true ends the session and exits the skill.
     should_end_session = True
@@ -108,6 +108,7 @@ def s3_send(package, code):
     # Write to S3 Bucket
     s3.put_object(Body=bytes(json.dumps(json_dict).encode('UTF-8')), Bucket='securityconfigs', Key=KEY)
     return err
+
 
 def give_access(intent, session):
     card_title = intent['name']
@@ -367,6 +368,8 @@ def on_intent(intent_request, session):
         return get_welcome_response()
     elif intent_name == "AMAZON.CancelIntent" or intent_name == "AMAZON.StopIntent":
         return handle_session_end_request()
+    elif intent_name == "AMAZON.StopIntent":
+        return get_welcome_response()
     else:
         return invalid_command(intent, session)
 
